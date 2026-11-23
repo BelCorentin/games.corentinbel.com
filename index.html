@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Games · Corentin Bel</title>
+<style>
+  :root { --bg:#0e1a24; --fg:#e8eef2; --muted:#8fa3b1; --card:#162836; --accent:#4fc3d9; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg);
+         font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding:48px 16px; }
+  main { max-width:720px; margin:0 auto; }
+  h1 { font-size:2.2rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 32px; }
+  p.sub a { color:var(--muted); }
+  ul { list-style:none; padding:0; margin:0; display:grid; gap:16px; }
+  a.game { display:block; padding:20px 22px; background:var(--card); border-radius:14px;
+           color:inherit; text-decoration:none; border:1px solid transparent; transition:border-color .15s; }
+  a.game:hover, a.game:focus-visible { border-color:var(--accent); }
+  a.game b { font-size:1.2rem; color:var(--accent); }
+  a.game span { display:block; color:var(--muted); margin-top:4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Games</h1>
+  <p class="sub">Small browser games by <a href="https://corentinbel.com">Corentin Bel</a>.</p>
+  <ul>
+    <li><a class="game" href="wing/"><b>Wingfoil</b>
+      <span>Wingfoiling simulator: ride swell, race the slalom, chase a downwinder, jump.</span></a></li>
+  </ul>
+</main>
+</body>
+</html>
