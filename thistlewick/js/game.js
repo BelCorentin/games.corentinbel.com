@@ -65,7 +65,7 @@ function buildVillage() {
       { x: 24, y: 7, kind: "millstone_t", solid: true, ex: "millstone" },
     ],
     entities: [
-      { id: "dad", kind: "npc", x: 8, y: 18, dir: "down" },
+      { id: "dad", kind: "npc", x: 9, y: 18, dir: "down" },
       { id: "abel", kind: "npc", x: 18, y: 28, dir: "down" },
       { id: "bramble", kind: "dog", x: 22, y: 22, dir: "left", wander: [21, 19, 26, 25] },
       { id: "clover", kind: "sheep", blue: true, x: 6, y: 14, dir: "right", wander: [3, 13, 14, 16] },
@@ -111,18 +111,32 @@ const MAPS = {
 // ---------------------------------------------------------------- state
 const SAVE_KEY = "thistlewick-save-v1";
 let S = freshState();
-function freshState() { return { map: "village", x: 8, y: 21, dir: "up", clues: {}, unlocked: {}, told: {}, done: false }; }
+function freshState() { return { map: "village", x: 6, y: 23, dir: "down", clues: {}, unlocked: {}, told: {}, done: false }; }
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 function loadSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s && s.map ? s : null; } catch (e) { return null; } }
 
 let map, ents = [], player;
-function enterMap(id, x, y, dir) {
+function enterMap(id, x, y, dir, preview = false) {
   map = MAPS[id]; S.map = id; S.x = x; S.y = y; S.dir = dir;
   ents = map.entities.map((e) => ({ ...e, px: e.x * TS, py: e.y * TS, step: 0, moving: null, timer: 1 + Math.random() * 2 }));
   applyUnlocks();
+  player = null;
+  [x, y] = freeSpot(x, y); S.x = x; S.y = y;   // never start inside a wall/house (old saves spawned at 8,21)
   player = { x, y, px: x * TS, py: y * TS, dir, step: 0, moving: null, anim: 0 };
   prerender();
-  save();
+  if (!preview) save();   // the title-screen backdrop must not overwrite the real save
+}
+function freeSpot(x, y) {
+  const seen = new Set([`${x},${y}`]), q = [[x, y]];
+  while (q.length) {
+    const [cx, cy] = q.shift();
+    if (!solidAt(cx, cy, null) && (tileAt(cx, cy) !== "D" || (cx === x && cy === y))) return [cx, cy];
+    for (const [dx, dy] of Object.values(DIRS)) {
+      const k = `${cx + dx},${cy + dy}`;
+      if (!seen.has(k) && cx + dx >= 0 && cy + dy >= 0 && cx + dx < map.w && cy + dy < map.h) { seen.add(k); q.push([cx + dx, cy + dy]); }
+    }
+  }
+  return [x, y];
 }
 function applyUnlocks() {
   if (S.unlocked.crossing && map.id === "village") {
@@ -514,7 +528,7 @@ function startGame(fresh) {
   if (fresh) { S = freshState(); history = {}; }
   $("#title").classList.remove("on"); uiOpen = false;
   enterMap(S.map, S.x, S.y, S.dir); updateHud();
-  if (fresh) showOverlay(INTRO, () => toast("Arrows / WASD to walk · Space to talk · N for your notebook"));
+  if (fresh) showOverlay(INTRO, () => toast("Arrows / WASD (ZQSD on AZERTY) to walk · Space to talk · N for your notebook"));
 }
 $("#btnNew").addEventListener("click", () => startGame(true));
 $("#btnContinue").addEventListener("click", () => { const s = loadSave(); if (s) { S = s; startGame(false); } });
@@ -555,6 +569,6 @@ if (params.has("start")) {
   if (params.get("clues") === "all") for (const c of CLUE_ORDER) S.clues[c] = 1;
   if (params.has("crossing")) S.unlocked.crossing = true;
   $("#title").classList.remove("on"); enterMap(S.map, S.x, S.y, "up"); updateHud();
-} else { uiOpen = true; enterMap("village", 18, 22, "up"); }
+} else { uiOpen = true; enterMap("village", 18, 22, "up", true); }
 requestAnimationFrame(frame);
 window.__tw = { ask: (t) => ask(t), open: (id) => openDialog(id), get state() { return S; }, get player() { return player; }, get ents() { return ents.map(e => [e.id, e.x, e.y]); } };
