@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Thistlewick</title>
+<meta name="description" content="A small pixel mystery: find your missing twin sister by talking freely with the villagers, voiced by a tiny language model running in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#2b2233; --paper:#fbf4e2; --paper2:#f1e5c6; --accent:#d9644a; --muted:#7a6a5a; --gold:#f3c94a; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:#1d1824; overflow:hidden; font-family:"Pixelify Sans", ui-monospace, monospace; color:var(--ink); }
+  canvas#game { position:fixed; inset:0; width:100vw; height:100vh; image-rendering:pixelated; image-rendering:crisp-edges; }
+  button { font:inherit; cursor:pointer; }
+  .box { background:var(--paper); border:3px solid var(--ink); border-radius:6px; box-shadow:0 4px 0 var(--ink); }
+
+  /* HUD */
+  #hud { position:fixed; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; pointer-events:none; z-index:5; }
+  #hud button { pointer-events:auto; padding:6px 10px; font-size:16px; }
+  #toast { position:fixed; top:54px; left:50%; transform:translate(-50%,-10px); opacity:0; transition:all .25s; padding:8px 14px; z-index:6; font-size:17px; pointer-events:none; max-width:calc(100vw - 32px); text-align:center; }
+  #toast.on { opacity:1; transform:translate(-50%,0); }
+
+  /* dialogue */
+  #dlg { position:fixed; left:50%; bottom:12px; transform:translateX(-50%); width:min(760px, calc(100vw - 24px)); padding:12px 14px 10px; z-index:7; display:none; }
+  #dlg.on { display:block; }
+  #dlgName { position:absolute; top:-18px; left:14px; background:var(--accent); color:#fff; padding:2px 10px; border:3px solid var(--ink); border-radius:5px; font-weight:600; }
+  #dlgClose { position:absolute; top:6px; right:8px; border:none; background:none; font-size:20px; color:var(--muted); }
+  #dlgLog { max-height:min(34vh, 260px); overflow-y:auto; font-size:19px; line-height:1.35; padding-right:24px; white-space:pre-wrap; }
+  .line { margin:4px 0; }
+  .line.you { color:#3d7548; }
+  .line.you::before { content:"You: "; font-weight:600; }
+  .line.narr { color:var(--ink); }
+  .line.thinking { color:var(--muted); animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.3 } }
+  #dlgChips { display:none; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  #dlgChips.on { display:flex; }
+  #dlgChips button { background:var(--paper2); border:2px solid var(--ink); border-radius:12px; padding:2px 10px; font-size:15px; }
+  #dlgChips button:hover { background:var(--gold); }
+  #dlgForm { display:none; gap:6px; margin-top:8px; }
+  #dlgForm.on { display:flex; }
+  #dlgIn { flex:1; font:inherit; font-size:18px; padding:6px 8px; border:2px solid var(--ink); border-radius:5px; background:#fff; min-width:0; }
+  #dlgForm button { border:2px solid var(--ink); background:var(--accent); color:#fff; border-radius:5px; padding:4px 12px; }
+  #dlgHint { font-size:13px; color:var(--muted); margin-top:6px; }
+
+  /* notebook */
+  #notebook { position:fixed; inset:0; display:none; place-items:center; z-index:8; background:rgba(20,15,30,.55); padding:16px; }
+  #notebook.on { display:grid; }
+  #notebook .box { width:min(560px, 100%); max-height:88vh; overflow:auto; padding:16px 18px; background:var(--paper); }
+  #notebook h2 { margin:0 0 8px; }
+  #nbList { list-style:none; padding:0; margin:0 0 12px; }
+  #nbList li { padding:6px 0; border-bottom:2px dashed var(--paper2); font-size:16px; }
+  #nbList li b { display:block; color:var(--accent); }
+  #nbList li.unknown { color:#b8a888; }
+  #nbHint { background:var(--paper2); padding:8px 10px; border-radius:5px; font-size:16px; }
+  #nbHint::before { content:"💭 "; }
+
+  /* overlays */
+  #story, #title { position:fixed; inset:0; z-index:9; display:none; place-items:center; padding:16px; }
+  #story.on, #title.on { display:grid; }
+  #story { background:rgba(15,10,22,.85); cursor:pointer; }
+  #storyText { color:#fbf4e2; font-size:clamp(20px, 3.2vw, 28px); max-width:680px; text-align:center; line-height:1.4; white-space:pre-wrap; }
+  #story small { position:fixed; bottom:20px; left:0; right:0; text-align:center; color:#a898b8; }
+  #title { background:linear-gradient(rgba(20,15,30,.25), rgba(20,15,30,.7)); }
+  #title .box { width:min(520px, 100%); padding:22px; text-align:center; }
+  #title h1 { margin:0; font-size:clamp(38px, 8vw, 56px); color:var(--accent); letter-spacing:1px; text-shadow:3px 3px 0 var(--gold); }
+  #titleSub { margin:6px 0 16px; color:var(--muted); font-size:17px; }
+  .big { display:block; width:100%; margin:8px 0; padding:10px; font-size:20px; border:3px solid var(--ink); border-radius:6px; background:var(--gold); box-shadow:0 3px 0 var(--ink); }
+  .big.alt { background:var(--paper2); }
+  .voices { text-align:left; margin-top:14px; padding-top:12px; border-top:2px dashed var(--paper2); font-size:15px; }
+  .voices select { font:inherit; font-size:15px; width:100%; margin:6px 0; padding:4px; border:2px solid var(--ink); border-radius:5px; background:#fff; }
+  .voices .row { display:flex; gap:8px; }
+  .voices button { border:2px solid var(--ink); border-radius:5px; background:var(--accent); color:#fff; padding:4px 10px; white-space:nowrap; }
+  .voices button:disabled { opacity:.5; cursor:default; }
+  .bar { height:6px; background:var(--paper2); border-radius:3px; margin-top:6px; overflow:hidden; }
+  #voiceBar { height:100%; width:0; background:var(--accent); transition:width .2s; }
+  .voiceStatus { color:var(--muted); margin-top:6px; }
+  .voiceStatus.on { color:#3d7548; } .voiceStatus.off { color:#a9524a; }
+  #voicesPanel { position:fixed; top:54px; right:10px; width:min(360px, calc(100vw - 20px)); padding:12px 14px; z-index:8; display:none; }
+  #voicesPanel.on { display:block; }
+  #voicesPanel .voices { margin:0; padding:0; border:none; }
+  .credit { margin-top:12px; font-size:12px; color:var(--muted); }
+  .credit a { color:var(--muted); }
+
+  /* touch pad */
+  #pad { position:fixed; bottom:16px; left:16px; right:16px; display:none; justify-content:space-between; align-items:flex-end; z-index:4; pointer-events:none; }
+  @media (pointer:coarse) { #pad { display:flex; } }
+  .dpad { display:grid; grid-template-columns:repeat(3, 52px); grid-template-rows:repeat(3, 52px); }
+  #pad button { pointer-events:auto; border:3px solid var(--ink); background:rgba(251,244,226,.85); border-radius:10px; font-size:20px; touch-action:none; user-select:none; }
+  #pad .a { width:72px; height:72px; border-radius:50%; background:rgba(243,201,74,.9); font-size:24px; }
+  #dlg.on ~ #pad { display:none; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Thistlewick village"></canvas>
+
+<div id="hud">
+  <button id="nbBtn" class="box">📓 Notebook 0/9</button>
+  <button id="hudVoices" class="box">🗣 Voices</button>
+</div>
+<div id="toast" class="box"></div>
+
+<div id="dlg" class="box" role="dialog" aria-live="polite">
+  <div id="dlgName"></div>
+  <button id="dlgClose" aria-label="Close">✕</button>
+  <div id="dlgLog"></div>
+  <div id="dlgChips"></div>
+  <form id="dlgForm" autocomplete="off"><input id="dlgIn" placeholder="Say something…" maxlength="200"><button>Say</button></form>
+  <div id="dlgHint"></div>
+</div>
+
+<div id="pad">
+  <div class="dpad">
+    <span></span><button data-pad="up">▲</button><span></span>
+    <button data-pad="left">◀</button><span></span><button data-pad="right">▶</button>
+    <span></span><button data-pad="down">▼</button><span></span>
+  </div>
+  <button class="a" data-pad="a">A</button>
+</div>
+
+<div id="notebook"><div class="box">
+  <h2>Moss's notebook</h2>
+  <ul id="nbList"></ul>
+  <div id="nbHint"></div>
+  <p style="text-align:right;margin:10px 0 0"><button id="nbClose" class="big alt" style="display:inline-block;width:auto;padding:4px 14px;font-size:16px">Close (N)</button></p>
+</div></div>
+
+<div id="voicesPanel" class="box"><div class="voices">
+  <b>Villager voices</b>
+  <p style="margin:4px 0">A small language model runs in your browser (WebGPU). It's downloaded once, then cached. The story itself is fixed by the game: the model only gives the villagers a voice.</p>
+  <div class="row"><select id="modelSel"></select><button id="btnVoices">Wake</button></div>
+  <div class="bar"><div id="voiceBar"></div></div>
+  <div class="voiceStatus"></div>
+  <p style="text-align:right;margin:8px 0 0"><button id="voicesClose" style="background:var(--paper2);color:var(--ink)">Close</button></p>
+</div></div>
+
+<div id="title" class="on"><div class="box">
+  <h1>Thistlewick</h1>
+  <p id="titleSub">A small mystery. Your twin sister is missing.</p>
+  <button id="btnNew" class="big">New game</button>
+  <button id="btnContinue" class="big alt">Continue</button>
+  <div class="voices">
+    Villagers can talk freely with a small AI running on your own computer. Optional: without it, they use their written lines.
+    <div class="row" style="margin-top:6px"><button onclick="document.querySelector('#voicesPanel').classList.add('on')">Set up voices…</button></div>
+    <div class="voiceStatus"></div>
+  </div>
+  <p class="credit">Arrows / WASD walk · Space talk & examine · N notebook. Original game by <a href="https://corentinbel.com">Corentin Bel</a>.</p>
+</div></div>
+
+<div id="story"><div id="storyText"></div><small>click / Space to continue</small></div>
+
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
